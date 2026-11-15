@@ -18,8 +18,8 @@ const urbanist = Urbanist({
 });
 
 export const metadata: Metadata = {
-  title: "estate - PrebuiltUI",
-  description: "Helping families find their dream homes. Discover exceptional properties, expert advice, and a seamless buying or selling experience tailored to your goals.",
+  title: "VibeFit | Panel de gestión",
+  description: "Panel administrativo para la gestión de VibeFit.",
 };
 
 export default function RootLayout({
