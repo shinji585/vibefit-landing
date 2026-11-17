@@ -4,10 +4,10 @@ import { Navbar } from '@/components/navbar';
 import LenisScroll from '@/components/lenis-scroll';
 
 export const metadata = {
-    title: 'estate - PrebuiltUI',
-    description: 'estate is a real estate website template.',
+    title: 'VibeFit | Entrena a tu manera',
+    description: 'Entrena con VibeFit y avanza hacia tus objetivos.',
     appleWebApp: {
-        title: 'estate - PrebuiltUI',
+        title: 'VibeFit',
     },
 };
 

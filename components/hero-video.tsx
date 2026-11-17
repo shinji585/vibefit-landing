@@ -53,7 +53,7 @@ export default function HeroVideo() {
             muted
             loop
             playsInline
-            preload="auto"
+            preload={index === currentIndex ? "auto" : "none"}
             aria-hidden="true"
             tabIndex={-1}
             onTimeUpdate={(event) => {

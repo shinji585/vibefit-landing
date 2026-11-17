@@ -12,10 +12,40 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { ArrowLeft, ArrowRight, MousePointer2 } from "lucide-react";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
+import Image from "next/image";
+import Link from "next/link";
 import { login } from "@/app/actions/auth";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+
+function GoogleIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      className="size-5"
+      viewBox="0 0 48 48"
+      aria-hidden="true"
+    >
+      <path
+        fill="#FFC107"
+        d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-2.641-.21-5.236-.611-7.743z"
+      />
+      <path
+        fill="#FF3D00"
+        d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"
+      />
+      <path
+        fill="#4CAF50"
+        d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"
+      />
+      <path
+        fill="#1976D2"
+        d="M43.611 20.083H42V20H24v8h11.303c-.792 2.237-2.231 4.166-4.087 5.571l6.19 5.238C42.022 35.026 44 30.038 44 24c0-2.641-.21-5.236-.611-7.743z"
+      />
+    </svg>
+  );
+}
 
 const credentialsSchema = z.object({
   fullName: z.string(),
@@ -50,6 +80,7 @@ export function SplitLoginForm({
     ok: boolean;
     text: string;
   } | null>(null);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [interacted, setInteracted] = useState(false);
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
@@ -79,6 +110,37 @@ export function SplitLoginForm({
     mouseX.set(event.clientX - rect.left);
     mouseY.set(event.clientY - rect.top);
     if (!interacted) setInteracted(true);
+  }
+
+  async function handleGoogleSignIn() {
+    setMessage(null);
+    setGoogleLoading(true);
+
+    try {
+      const supabase = createClient();
+      const redirectTo = new URL("/auth/callback", window.location.origin);
+      redirectTo.searchParams.set("next", "/user-dashboard");
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: redirectTo.toString() },
+      });
+
+      if (error) {
+        console.error("Supabase Google sign-in failed.", error);
+        setMessage({
+          ok: false,
+          text: "No se pudo iniciar sesión con Google. Intenta de nuevo.",
+        });
+        setGoogleLoading(false);
+      }
+    } catch (error) {
+      console.error("Unexpected error while signing in with Google.", error);
+      setMessage({
+        ok: false,
+        text: "No se pudo iniciar sesión con Google. Intenta de nuevo más tarde.",
+      });
+      setGoogleLoading(false);
+    }
   }
 
   async function handleSubmit(values: FormValues) {
@@ -137,7 +199,7 @@ export function SplitLoginForm({
 
       setMessage({
         ok: true,
-        text: "Cuenta creada. Revisa tu correo para confirmarla.",
+        text: "Preinscripción enviada. Esto no activa una membresía ni completa tu inscripción; recepción te orientará para finalizarla. Si la plataforma solicita verificar tu correo, sigue esa indicación.",
       });
     } catch (error) {
       console.error("Unexpected error while creating an account.", error);
@@ -158,13 +220,17 @@ export function SplitLoginForm({
           layout
           transition={{ type: "spring", stiffness: 90, damping: 22 }}
           onMouseMove={handleMouseMove}
-          className={`relative order-1 flex min-h-[360px] flex-col justify-between overflow-hidden bg-gradient-to-br from-zinc-950 via-zinc-800 to-zinc-600 p-6 text-white sm:min-h-[400px] sm:p-10 lg:min-h-0 lg:p-12 ${panelOrder}`}
+          className={`relative order-1 flex min-h-[360px] flex-col justify-between overflow-hidden p-6 text-zinc-900 sm:min-h-[400px] sm:p-10 lg:min-h-0 lg:p-12 ${panelOrder}`}
+          style={{
+            background:
+              "radial-gradient(ellipse at 20% 0%, #E3D9FC 0%, transparent 55%), radial-gradient(ellipse at 90% 100%, #f7d9f5 0%, transparent 55%), #ffffff",
+          }}
         >
           <div
-            className="pointer-events-none absolute inset-0 opacity-50"
+            className="pointer-events-none absolute inset-0 opacity-40"
             style={{
               backgroundImage:
-                "linear-gradient(to right, rgba(255,255,255,0.16) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.16) 1px, transparent 1px)",
+                "linear-gradient(to right, rgba(145,115,205,0.18) 1px, transparent 1px), linear-gradient(to bottom, rgba(145,115,205,0.18) 1px, transparent 1px)",
               backgroundSize: "30px 30px",
               maskImage: "radial-gradient(ellipse at top left, black, transparent 75%)",
             }}
@@ -176,7 +242,7 @@ export function SplitLoginForm({
             transition={{ duration: 0.3 }}
             style={{
               backgroundImage:
-                "linear-gradient(to right, rgba(255,255,255,0.35) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.35) 1px, transparent 1px)",
+                "linear-gradient(to right, rgba(191,64,250,0.24) 1px, transparent 1px), linear-gradient(to bottom, rgba(191,64,250,0.24) 1px, transparent 1px)",
               backgroundSize: "30px 30px",
               WebkitMaskImage: spotlightMask,
               maskImage: spotlightMask,
@@ -191,7 +257,7 @@ export function SplitLoginForm({
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.3 }}
-                className="absolute bottom-4 right-5 z-10 hidden items-center gap-1.5 text-xs text-white/60 lg:flex"
+                className="absolute bottom-4 right-5 z-10 hidden items-center gap-1.5 text-xs text-zinc-500 lg:flex"
               >
                 <MousePointer2 className="size-3.5" aria-hidden="true" />
                 Mueve el cursor para iluminar la cuadrícula
@@ -201,9 +267,18 @@ export function SplitLoginForm({
 
           <div className="relative z-10 flex items-center justify-between lg:block">
             <div className="space-y-2">
-              <p className="text-xs font-medium uppercase tracking-[0.24em] text-white/65">
-                VibeFit
-              </p>
+              <div className="flex items-center gap-2">
+                <Image
+                  src="/logorecojido.svg"
+                  alt=""
+                  width={32}
+                  height={32}
+                  className="size-8"
+                />
+                <span className="text-sm font-semibold tracking-wide text-zinc-900">
+                  VibeFit
+                </span>
+              </div>
               <AnimatePresence mode="wait">
                 <motion.div
                   key={mode}
@@ -212,12 +287,12 @@ export function SplitLoginForm({
                   exit={{ opacity: 0, x: isSignup ? -18 : 18 }}
                   transition={{ duration: 0.25 }}
                 >
-                  <h2 className="text-xl font-semibold text-balance sm:text-2xl">
+                  <h2 className="text-xl font-semibold text-balance text-zinc-900 sm:text-2xl">
                     {isSignup ? "Tu cambio empieza hoy" : "Tu progreso te espera"}
                   </h2>
-                  <p className="mt-1 max-w-xs text-sm text-white/70">
+                  <p className="mt-1 max-w-xs text-sm text-zinc-600">
                     {isSignup
-                      ? "Crea tu cuenta y entrena con un plan hecho para ti."
+                      ? "Completa tu preinscripción para que recepción prepare tu ingreso."
                       : "Entra y sigue entrenando con tu plan al día."}
                   </p>
                 </motion.div>
@@ -225,8 +300,12 @@ export function SplitLoginForm({
             </div>
             <motion.div
               layout
-              className="mt-2 flex h-28 w-full items-center justify-center sm:h-36 lg:mt-4 lg:h-[390px]"
+              className="relative mt-2 flex h-36 w-full items-center justify-center sm:h-48 lg:my-auto lg:mt-4 lg:h-[390px]"
             >
+              <div
+                className="pointer-events-none absolute bottom-8 left-1/2 h-16 w-2/3 -translate-x-1/2 rounded-[50%] bg-violet-300/35 blur-2xl"
+                aria-hidden="true"
+              />
               <AnimatePresence mode="wait">
                 <motion.div
                   key={illustration}
@@ -234,7 +313,7 @@ export function SplitLoginForm({
                   animate={{ opacity: 1, x: 0, scale: 1 }}
                   exit={{ opacity: 0, x: isSignup ? -30 : 30, scale: 0.96 }}
                   transition={{ duration: 0.35 }}
-                  className="flex h-full w-full items-center justify-center"
+                  className="relative flex h-full w-full max-w-lg items-center justify-center drop-shadow-xl"
                 >
                   <DotLottieReact src={illustration} loop autoplay />
                 </motion.div>
@@ -247,16 +326,16 @@ export function SplitLoginForm({
               type="button"
               variant="outline"
               onClick={toggleMode}
-              className="h-10 rounded-full border-white/30 bg-white/10 px-5 text-white backdrop-blur-sm hover:bg-white hover:text-zinc-950"
+              className="h-10 rounded-full border-zinc-300 bg-white/70 px-5 text-zinc-900 backdrop-blur-sm hover:bg-white"
             >
-              {isSignup ? "Iniciar sesión" : "Crear cuenta"}
+              {isSignup ? "Iniciar sesión" : "Solicitar preinscripción"}
               {isSignup ? (
                 <ArrowLeft aria-hidden="true" />
               ) : (
                 <ArrowRight aria-hidden="true" />
               )}
             </Button>
-            <span className="text-xs text-white/65">
+            <span className="text-xs text-zinc-600">
               {isSignup ? "Únete a VibeFit" : "Entrena a tu manera"}
             </span>
           </div>
@@ -265,9 +344,16 @@ export function SplitLoginForm({
         <motion.section
           layout
           transition={{ type: "spring", stiffness: 90, damping: 22 }}
-          className={`order-2 flex items-center justify-center px-6 py-10 sm:px-12 lg:px-14 ${formOrder}`}
+          className={`relative order-2 flex items-center justify-center px-6 py-8 sm:px-12 sm:py-10 lg:px-14 lg:py-8 ${formOrder}`}
         >
           <div className="w-full max-w-md">
+            <Link
+              href="/"
+              className="mb-8 inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 hover:text-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400"
+            >
+              <ArrowLeft className="size-4" aria-hidden="true" />
+              Volver al inicio
+            </Link>
             <div className="mb-8 space-y-2">
               <AnimatePresence mode="wait">
                 <motion.div
@@ -278,14 +364,14 @@ export function SplitLoginForm({
                   transition={{ duration: 0.2 }}
                 >
                   <p className="text-xs font-medium uppercase tracking-[0.22em] text-zinc-500">
-                    {isSignup ? "Únete a la comunidad" : "Bienvenido de nuevo"}
+                    {isSignup ? "Preinscripción" : "Bienvenido de nuevo"}
                   </p>
                   <h1 className="mt-2 text-3xl font-semibold tracking-tight text-zinc-950 sm:text-4xl">
-                    {isSignup ? "Crea tu cuenta" : "Inicia sesión"}
+                    {isSignup ? "Solicita tu preinscripción" : "Inicia sesión"}
                   </h1>
                   <p className="mt-2 text-sm text-zinc-500">
                     {isSignup
-                      ? "Completa tus datos para empezar a entrenar."
+                      ? "Enviar tus datos no activa una membresía. Recepción completará tu inscripción en una sede."
                       : "Inicia sesión en tu cuenta para continuar."}
                   </p>
                 </motion.div>
@@ -313,7 +399,7 @@ export function SplitLoginForm({
                       placeholder="Tu nombre y apellido"
                       aria-invalid={Boolean(form.formState.errors.fullName)}
                       {...form.register("fullName")}
-                      className="mt-2 h-11 rounded-md border-zinc-200 px-3 text-sm focus-visible:border-zinc-500 focus-visible:ring-zinc-300"
+                      className="mt-2 h-12 rounded-2xl border-zinc-200 bg-zinc-50/70 px-4 text-sm focus-visible:border-violet-400 focus-visible:ring-violet-300"
                     />
                     {form.formState.errors.fullName && (
                       <span className="block text-xs text-red-600">
@@ -333,7 +419,7 @@ export function SplitLoginForm({
                   placeholder="tu@correo.com"
                   aria-invalid={Boolean(form.formState.errors.email)}
                   {...form.register("email")}
-                  className="mt-2 h-11 rounded-md border-zinc-200 px-3 text-sm focus-visible:border-zinc-500 focus-visible:ring-zinc-300"
+                  className="mt-2 h-12 rounded-2xl border-zinc-200 bg-zinc-50/70 px-4 text-sm focus-visible:border-violet-400 focus-visible:ring-violet-300"
                 />
                 {form.formState.errors.email && (
                   <span className="block text-xs text-red-600">
@@ -350,7 +436,7 @@ export function SplitLoginForm({
                   placeholder={isSignup ? "Mínimo 8 caracteres" : "Tu contraseña"}
                   aria-invalid={Boolean(form.formState.errors.password)}
                   {...form.register("password")}
-                  className="mt-2 h-11 rounded-md border-zinc-200 px-3 text-sm focus-visible:border-zinc-500 focus-visible:ring-zinc-300"
+                  className="mt-2 h-12 rounded-2xl border-zinc-200 bg-zinc-50/70 px-4 text-sm focus-visible:border-violet-400 focus-visible:ring-violet-300"
                 />
                 {form.formState.errors.password && (
                   <span className="block text-xs text-red-600">
@@ -376,7 +462,7 @@ export function SplitLoginForm({
                       placeholder="Repite tu contraseña"
                       aria-invalid={Boolean(form.formState.errors.confirmPassword)}
                       {...form.register("confirmPassword")}
-                      className="mt-2 h-11 rounded-md border-zinc-200 px-3 text-sm focus-visible:border-zinc-500 focus-visible:ring-zinc-300"
+                      className="mt-2 h-12 rounded-2xl border-zinc-200 bg-zinc-50/70 px-4 text-sm focus-visible:border-violet-400 focus-visible:ring-violet-300"
                     />
                     {form.formState.errors.confirmPassword && (
                       <span className="block text-xs text-red-600">
@@ -404,26 +490,44 @@ export function SplitLoginForm({
               <Button
                 type="submit"
                 disabled={form.formState.isSubmitting}
-                className="h-11 w-full rounded-md bg-zinc-950 text-sm text-white hover:bg-zinc-800"
+                className="h-12 w-full rounded-2xl bg-zinc-950 text-sm text-white hover:bg-zinc-800"
               >
                 {form.formState.isSubmitting
                   ? isSignup
-                    ? "Creando cuenta..."
+                    ? "Enviando preinscripción..."
                     : "Iniciando sesión..."
                   : isSignup
-                    ? "Crear cuenta"
+                    ? "Enviar preinscripción"
                     : "Iniciar sesión"}
               </Button>
             </form>
 
+            <div className="relative my-6 flex items-center justify-center">
+              <span className="w-full border-t border-zinc-200" />
+              <span className="absolute bg-white px-4 text-sm text-zinc-500">
+                O continúa con
+              </span>
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleGoogleSignIn}
+              disabled={googleLoading || form.formState.isSubmitting}
+              className="h-12 w-full gap-3 rounded-2xl border-zinc-200 bg-white text-sm font-medium text-zinc-800 hover:bg-zinc-50"
+            >
+              <GoogleIcon />
+              {googleLoading ? "Conectando con Google..." : "Continuar con Google"}
+            </Button>
+
             <p className="mt-6 text-center text-sm text-zinc-500">
-              {isSignup ? "¿Ya tienes cuenta?" : "¿No tienes cuenta?"}{" "}
+              {isSignup ? "¿Ya tienes cuenta?" : "¿Aún no has iniciado tu preinscripción?"}{" "}
               <button
                 type="button"
                 onClick={toggleMode}
                 className="font-medium text-zinc-900 underline decoration-zinc-300 underline-offset-4 transition-colors hover:decoration-zinc-900"
               >
-                {isSignup ? "Inicia sesión" : "Crea una gratis"}
+                {isSignup ? "Inicia sesión" : "Preinscribirme"}
               </button>
             </p>
           </div>

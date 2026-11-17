@@ -60,7 +60,7 @@ export function CallToAction() {
           viewport={{ once: true }}
           transition={{ type: "spring", stiffness: 320, damping: 70, mass: 1 }}
         >
-          <span>Crear cuenta</span>
+          <span>Solicitar preinscripción</span>
           <MoveRight size={16} className="transition-transform duration-200 group-hover:translate-x-1" />
         </motion.a>
       </div>

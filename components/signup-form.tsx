@@ -66,7 +66,7 @@ export function SignupForm() {
         console.error("Supabase sign-up failed.", error);
         setMessage({
           ok: false,
-          text: "No se pudo crear la cuenta. Revisa los datos e intenta de nuevo.",
+          text: "No se pudo enviar la preinscripción. Revisa los datos e intenta de nuevo.",
         });
         return;
       }
@@ -79,13 +79,13 @@ export function SignupForm() {
 
       setMessage({
         ok: true,
-        text: "Cuenta creada. Revisa tu correo para confirmarla.",
+        text: "Preinscripción enviada. Esto no activa una membresía; recepción te orientará para completar tu inscripción en una sede.",
       });
     } catch (error) {
       console.error("Unexpected error while creating an account.", error);
       setMessage({
         ok: false,
-        text: "No se pudo crear la cuenta. Intenta de nuevo más tarde.",
+        text: "No se pudo enviar la preinscripción. Intenta de nuevo más tarde.",
       });
     } finally {
       setLoading(false);
@@ -156,7 +156,7 @@ export function SignupForm() {
           disabled={loading}
           className="w-fit cursor-pointer rounded-full bg-black px-6 py-3.5 text-xs text-white transition-colors duration-200 hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {loading ? "Creando..." : "Crear cuenta"}
+          {loading ? "Enviando..." : "Enviar preinscripción"}
         </button>
 
         {message && (

@@ -8,7 +8,8 @@ import HeroVideo from "@/components/hero-video";
 export function HeroSection() {
   return (
     <motion.section
-      className="relative isolate min-h-screen w-full overflow-hidden bg-black"
+      id="inicio"
+      className="relative isolate min-h-screen w-full scroll-mt-24 overflow-hidden bg-black"
       initial={{ opacity: 0.4 }}
       whileInView={{ opacity: 1 }}
       viewport={{ once: true }}

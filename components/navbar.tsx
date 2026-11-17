@@ -21,38 +21,38 @@ export function Navbar() {
       <nav
         className={`fixed z-50 flex items-center justify-between left-1/2 -translate-x-1/2 transition-all duration-500 p-4 ${scrolled ? "lg:w-5xl w-[calc(100vw-14px)] bg-white/60 backdrop-blur-2xl rounded-full mt-4 pl-6 shadow" : "md:px-16 lg:px-24 xl:px-32 w-full"}`}
       >
-        <a href="https://prebuiltui.com">
+        <Link href="/" aria-label="VibeFit - Inicio">
           <Image
             width={100}
             height={100}
             src="/logo.svg"
-            alt="Logo"
+            alt="VibeFit"
             className={`transition-all duration-500 h-9 w-auto ${scrolled ? "invert opacity-80" : ""}`}
           />
-        </a>
+        </Link>
 
         {/* Desktop links */}
         <div className="hidden md:flex items-center gap-6 md:gap-10 text-sm">
           <a
-            href="#"
+            href="#inicio"
             className={`transition-colors duration-500 ${scrolled ? "text-zinc-800 hover:text-zinc-600" : "text-white hover:text-white/90"}`}
           >
             Inicio
           </a>
           <a
-            href="#"
+            href="#quienes-somos"
             className={`transition-colors duration-500 ${scrolled ? "text-zinc-800 hover:text-zinc-600" : "text-white hover:text-white/90"}`}
           >
-            Galería
+            Quiénes somos
           </a>
           <a
-            href="#"
+            href="#comunidad"
             className={`transition-colors duration-500 ${scrolled ? "text-zinc-800 hover:text-zinc-600" : "text-white hover:text-white/90"}`}
           >
-            Planes
+            Comunidad
           </a>
           <a
-            href="/login?mode=signup"
+            href="#registro"
             className={`transition-colors duration-500 ${scrolled ? "text-zinc-800 hover:text-zinc-600" : "text-white hover:text-white/90"}`}
           >
             Únete
@@ -102,7 +102,7 @@ export function Navbar() {
         className={`${mobileOpen ? "max-md:w-full" : "max-md:w-0"} md:hidden max-md:fixed max-md:top-0 max-md:z-50 max-md:left-0 max-md:transition-all max-md:duration-300 max-md:overflow-hidden max-md:h-full max-md:bg-white/5 max-md:backdrop-blur max-md:flex-col max-md:justify-center flex items-center gap-6 md:gap-10 text-sm`}
       >
         <a
-          href="#"
+          href="#inicio"
           onClick={() => {
             setMobileOpen(false);
           }}
@@ -111,25 +111,25 @@ export function Navbar() {
           Inicio
         </a>
         <a
-          href="#"
+          href="#quienes-somos"
           onClick={() => {
             setMobileOpen(false);
           }}
           className={`transition-colors duration-500 ${scrolled ? "text-zinc-800 hover:text-zinc-600" : "text-white hover:text-white/90"}`}
         >
-          Galería
+          Quiénes somos
         </a>
         <a
-          href="#"
+          href="#comunidad"
           onClick={() => {
             setMobileOpen(false);
           }}
           className={`transition-colors duration-500 ${scrolled ? "text-zinc-800 hover:text-zinc-600" : "text-white hover:text-white/90"}`}
         >
-          Planes
+          Comunidad
         </a>
         <a
-          href="/login?mode=signup"
+          href="#registro"
           onClick={() => {
             setMobileOpen(false);
           }}

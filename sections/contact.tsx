@@ -6,7 +6,7 @@ import { SignupForm } from "@/components/signup-form";
 
 export function Contact() {
     return (
-        <section id="registro" className="py-20 w-full flex items-center justify-center">
+        <section id="registro" className="scroll-mt-24 py-20 w-full flex items-center justify-center">
             <div className="max-w-5xl w-full mx-auto px-4 grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
 
                 <div className="flex flex-col">
@@ -19,7 +19,7 @@ export function Contact() {
                     >
                         <span className="size-1.5 bg-zinc-900"></span>
                         <span className="text-sm text-zinc-900">
-                            REGISTRO
+                            PREINSCRIPCIÓN
                         </span>
                     </motion.div>
 
@@ -29,8 +29,14 @@ export function Contact() {
                         viewport={{ once: true }}
                         transition={{ type: "spring", stiffness: 240, damping: 70, mass: 1 }}
                     >
-                        Crea tu cuenta y empieza a entrenar
+                        Inicia tu preinscripción
                     </motion.h2>
+
+                    <p className="mt-3 max-w-[400px] text-sm leading-6 text-zinc-600">
+                        Enviar tus datos no activa una membresía. Completarás tu
+                        inscripción y la activación de tu plan con recepción en
+                        una de nuestras sedes.
+                    </p>
 
                     <SignupForm />
                 </div>

@@ -50,7 +50,16 @@ export async function login(values: { email: string; password: string }) {
   }
 
   const isManager = rolesResult.data?.some(({ role }) => role === "manager");
-  redirect(isManager ? "/manager-dashboard" : "/user-dashboard");
+  const isReceptionist = rolesResult.data?.some(
+    ({ role }) => role === "receptionist",
+  );
+  redirect(
+    isManager
+      ? "/manager-dashboard"
+      : isReceptionist
+        ? "/receptionist-dashboard"
+        : "/user-dashboard",
+  );
 }
 
 export async function logout() {

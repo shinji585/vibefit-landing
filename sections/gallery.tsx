@@ -25,7 +25,7 @@ const collageImages = [
 
 export function Gallery() {
     return (
-        <section className="w-full px-4 py-20 md:px-16 md:py-28 lg:px-24 xl:px-32">
+        <section id="comunidad" className="w-full scroll-mt-24 px-4 py-20 md:px-16 md:py-28 lg:px-24 xl:px-32">
             <div className="mx-auto grid max-w-7xl items-center gap-12 md:grid-cols-2 md:gap-16 lg:gap-24">
                 <div className="max-w-xl">
                     <div className="flex items-center gap-1.5">

@@ -20,7 +20,7 @@ export default async function ManagerDashboardPage() {
   const [accountResult, rolesResult] = await Promise.all([
     supabase
       .from("users")
-      .select("account_status")
+      .select("account_status, full_name, email")
       .eq("id", userId)
       .maybeSingle(),
     supabase.from("user_roles").select("role").eq("user_id", userId),
@@ -37,9 +37,19 @@ export default async function ManagerDashboardPage() {
     redirect("/login?error=inactive");
   }
 
-  if (!rolesResult.data?.some(({ role }) => role === "manager")) {
+  const roles = rolesResult.data ?? [];
+  if (!roles.some(({ role }) => role === "manager")) {
+    if (roles.some(({ role }) => role === "receptionist")) {
+      redirect("/receptionist-dashboard");
+    }
     redirect("/user-dashboard");
   }
 
-  return <ManagerDashboard />;
+  return (
+    <ManagerDashboard
+      managerId={userId}
+      managerName={accountResult.data.full_name}
+      managerEmail={accountResult.data.email}
+    />
+  );
 }
