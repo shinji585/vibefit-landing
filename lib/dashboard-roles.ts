@@ -23,6 +23,22 @@ export const dashboardRoleChoices = [
     href: "/coach-dashboard",
     animation: "creating",
   },
+  {
+    role: "nutritionist",
+    label: "Nutricionista",
+    title: "Dashboard del nutricionista",
+    description: "Acompaña a tus clientes con sus planes de alimentación.",
+    href: "/nutritionist-dashboard",
+    animation: "lifestyle",
+  },
+  {
+    role: "client",
+    label: "Cliente",
+    title: "Dashboard del cliente",
+    description: "Consulta tus planes y sigue tu progreso.",
+    href: "/client-dashboard",
+    animation: "fitness",
+  },
 ] as const;
 
 export type DashboardRoleChoice = (typeof dashboardRoleChoices)[number];

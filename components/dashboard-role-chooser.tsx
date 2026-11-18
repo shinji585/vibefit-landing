@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { CreatingAnimation } from "@/components/creating-animation";
+import { FitnessAnimation } from "@/components/fitness-animation";
+import { LifestyleAnimation } from "@/components/lifestyle-animation";
 import { OfficeAnimation } from "@/components/office-animation";
 import type { DashboardRoleChoice } from "@/lib/dashboard-roles";
 
@@ -52,6 +54,10 @@ export function DashboardRoleChooser({
               <div className="mt-auto transition-transform duration-500 ease-out group-hover:scale-[1.02]">
                 {choice.animation === "office" ? (
                   <OfficeAnimation className="w-full" />
+                ) : choice.animation === "lifestyle" ? (
+                  <LifestyleAnimation className="w-full" />
+                ) : choice.animation === "fitness" ? (
+                  <FitnessAnimation className="w-full" />
                 ) : (
                   <CreatingAnimation />
                 )}

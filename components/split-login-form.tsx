@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   AnimatePresence,
   motion,
@@ -90,6 +90,22 @@ export function SplitLoginForm({
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
   const spotlightMask = useMotionTemplate`radial-gradient(180px circle at ${mouseX}px ${mouseY}px, black, transparent)`;
+
+  useEffect(() => {
+    cancelDashboardLoading();
+
+    function resetLoginLoading() {
+      setGoogleLoading(false);
+      cancelDashboardLoading();
+    }
+
+    window.addEventListener("pageshow", resetLoginLoading);
+    window.addEventListener("popstate", resetLoginLoading);
+    return () => {
+      window.removeEventListener("pageshow", resetLoginLoading);
+      window.removeEventListener("popstate", resetLoginLoading);
+    };
+  }, []);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(credentialsSchema),
