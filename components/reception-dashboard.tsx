@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import Image from "next/image";
 import {
   assignReceptionMembership,
   createReceptionClient,
@@ -10,11 +9,20 @@ import {
 } from "@/app/actions/reception";
 import { logout } from "@/app/actions/auth";
 import {
+  DashboardLoadingOverlay,
+  DashboardMascot,
+} from "@/components/dashboard-experience";
+import { DashboardSidebar } from "@/components/dashboard-sidebar";
+import { AnimatedIcon } from "@/components/animated-icon";
+import { OfficeAnimation } from "@/components/office-animation";
+import {
   BellIcon,
   CalendarIcon,
+  MenuTwoIcon,
   PieChartIcon,
   TableIcon,
   UsersIcon,
+  XIcon,
 } from "@/components/dashboard-icons";
 import {
   MembershipStatusChart,
@@ -53,6 +61,13 @@ type ReceptionDashboardData = {
 };
 
 type Feedback = { ok: boolean; text: string };
+
+const navigation = [
+  { label: "Preinscripciones", href: "#preinscripciones", icon: UsersIcon },
+  { label: "Usuarios", href: "#usuarios", icon: UsersIcon },
+  { label: "Asistencia", href: "#asistencia", icon: CalendarIcon },
+  { label: "Planes", href: "#planes", icon: TableIcon },
+];
 
 function formatBogotaDate(date: string) {
   return new Date(`${date}T12:00:00-05:00`).toLocaleDateString("es-CO", {
@@ -153,8 +168,10 @@ function Modal({
 
 export function ReceptionDashboard({
   receptionistName,
+  receptionistEmail,
 }: {
   receptionistName: string | null;
+  receptionistEmail: string;
 }) {
   const [data, setData] = useState<ReceptionDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -166,6 +183,22 @@ export function ReceptionDashboard({
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [collapsed, setCollapsed] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState("resumen");
+
+  const isExpanded = !collapsed || hovered;
+  const currentSection =
+    activeSection === "preinscripciones"
+      ? "Preinscripciones"
+      : activeSection === "usuarios"
+        ? "Usuarios"
+        : activeSection === "asistencia"
+          ? "Asistencia"
+          : activeSection === "planes"
+            ? "Planes"
+            : "Resumen";
 
   const loadData = useCallback(async () => {
     setLoadError(null);
@@ -194,6 +227,28 @@ export function ReceptionDashboard({
       window.clearInterval(intervalId);
     };
   }, [loadData]);
+
+  useEffect(() => {
+    function syncSectionFromHash() {
+      const currentHash = window.location.hash.slice(1);
+      const sectionId = currentHash === "inicio" ? "resumen" : currentHash;
+      if (
+        ["resumen", "preinscripciones", "usuarios", "asistencia", "planes"].includes(
+          sectionId,
+        )
+      ) {
+        setActiveSection(sectionId);
+      }
+    }
+
+    syncSectionFromHash();
+    window.addEventListener("hashchange", syncSectionFromHash);
+    window.addEventListener("popstate", syncSectionFromHash);
+    return () => {
+      window.removeEventListener("hashchange", syncSectionFromHash);
+      window.removeEventListener("popstate", syncSectionFromHash);
+    };
+  }, []);
 
   const clientUsers = useMemo(
     () =>
@@ -291,6 +346,28 @@ export function ReceptionDashboard({
     { label: "Preinscripciones pendientes", value: pendingUsers.length },
   ];
 
+  function navigateToSection(href: string) {
+    const sectionId = href.slice(1);
+    if (
+      !["resumen", "preinscripciones", "usuarios", "asistencia", "planes"].includes(
+        sectionId,
+      )
+    ) {
+      return;
+    }
+    setActiveSection(sectionId);
+    window.history.pushState(null, "", href);
+    setMobileOpen(false);
+  }
+
+  function toggleSidebar() {
+    if (window.matchMedia("(min-width: 1024px)").matches) {
+      setCollapsed((value) => !value);
+      return;
+    }
+    setMobileOpen((value) => !value);
+  }
+
   async function handleAssignMembership(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!pendingClient || !selectedPlanId) {
@@ -365,27 +442,54 @@ export function ReceptionDashboard({
   );
 
   return (
-    <main className="min-h-screen bg-[#f7f8fa] text-zinc-900">
-      <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex h-[72px] max-w-[1440px] items-center justify-between gap-4 px-4 sm:px-8">
-          <a href="#inicio" className="flex items-center gap-2">
-            <Image
-              src="/logorecojido.svg"
-              alt=""
-              width={34}
-              height={34}
-              className="size-[34px]"
-            />
-            <span className="font-semibold tracking-tight">VibeFit</span>
-            <span className="hidden rounded-full bg-zinc-100 px-2.5 py-1 text-[11px] font-medium text-zinc-600 sm:inline-flex">
-              Recepción
-            </span>
-          </a>
-          <div className="flex items-center gap-3">
-            <div className="hidden text-right sm:block">
-              <p className="text-sm font-medium">{receptionistName || "Recepción"}</p>
-              <p className="text-xs text-zinc-500">Panel de recepción</p>
+    <div className="min-h-screen bg-[#f7f8fa] text-zinc-900">
+      <DashboardLoadingOverlay ready={!loading} />
+      <DashboardMascot />
+      <DashboardSidebar
+        items={navigation}
+        activeSection={activeSection}
+        footerLabel="Panel de recepción"
+        expanded={isExpanded}
+        mobileOpen={mobileOpen}
+        onNavigate={navigateToSection}
+        onMobileOpenChange={setMobileOpen}
+        onHoverChange={(value) => {
+          if (window.matchMedia("(min-width: 1024px)").matches && collapsed) {
+            setHovered(value);
+          }
+        }}
+      />
+      <div
+        className={`min-h-screen transition-[padding] duration-500 ease-in-out ${
+          isExpanded ? "lg:pl-[18.125rem]" : "lg:pl-[5.625rem]"
+        }`}
+      >
+        <header className="sticky top-0 z-30 flex h-[72px] items-center justify-between border-b border-zinc-200 bg-white/95 px-4 backdrop-blur sm:px-6 lg:px-8">
+          <div className="flex min-w-0 items-center gap-3">
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              aria-label={mobileOpen ? "Cerrar menú" : "Abrir o contraer menú"}
+              className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-zinc-200 text-zinc-600 transition hover:bg-zinc-50 sm:size-12"
+            >
+              <AnimatedIcon className="size-5">
+                {mobileOpen ? (
+                  <XIcon className="size-5" />
+                ) : (
+                  <MenuTwoIcon className="size-5" />
+                )}
+              </AnimatedIcon>
+            </button>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-zinc-900">
+                {currentSection}
+              </p>
+              <p className="hidden truncate text-xs text-zinc-500 sm:block">
+                {receptionistName || receptionistEmail}
+              </p>
             </div>
+          </div>
+          <div className="flex items-center gap-3">
             <div className="relative">
               <button
                 type="button"
@@ -446,44 +550,19 @@ export function ReceptionDashboard({
             <form action={logout}>
               <button
                 type="submit"
-                className="rounded-xl border border-zinc-200 px-3 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50"
+                className="rounded-xl border border-zinc-200 px-3 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50"
               >
-                Salir
+                Cerrar sesión
               </button>
             </form>
           </div>
-        </div>
       </header>
 
-      <div id="inicio" className="mx-auto max-w-[1440px] px-4 py-8 sm:px-8 sm:py-10">
-        <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
-              {data ? formatBogotaDate(data.today) : "Panel de control"}
-            </p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
-              Hola{receptionistName ? `, ${receptionistName.split(" ")[0]}` : ""}
-            </h1>
-            <p className="mt-2 text-sm text-zinc-500">
-              Gestiona preinscripciones, membresías y asistencia desde un solo lugar.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              setFeedback(null);
-              setShowCreateUser(true);
-            }}
-            className="inline-flex h-11 items-center justify-center rounded-xl bg-zinc-950 px-5 text-sm font-medium text-white transition hover:bg-zinc-800"
-          >
-            + Registrar usuario
-          </button>
-        </div>
-
+      <main className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
         {feedback && (
           <p
             role={feedback.ok ? "status" : "alert"}
-            className={`mt-6 rounded-xl px-4 py-3 text-sm ${
+            className={`mb-5 rounded-xl px-4 py-3 text-sm ${
               feedback.ok
                 ? "border border-emerald-200 bg-emerald-50 text-emerald-800"
                 : "border border-red-200 bg-red-50 text-red-700"
@@ -493,10 +572,49 @@ export function ReceptionDashboard({
           </p>
         )}
         {loadError && (
-          <p role="alert" className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <p
+            role="alert"
+            className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          >
             {loadError}
           </p>
         )}
+
+        <div id="resumen" hidden={activeSection !== "resumen"}>
+        <div
+          className="mb-8 grid overflow-hidden rounded-[28px] border border-zinc-200 bg-white"
+          style={{
+            gridTemplateColumns:
+              "repeat(auto-fit, minmax(min(100%, 360px), 1fr))",
+            minHeight: 500,
+          }}
+        >
+          <div className="flex flex-col justify-center p-5 sm:p-8 lg:p-10">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
+              VibeFit / Recepción
+            </p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
+              Bienvenido, {receptionistName?.trim() || "recepción"}
+            </h1>
+            <p className="mt-2 text-sm text-zinc-500">
+              Gestiona preinscripciones, membresías y asistencia desde un solo lugar.
+            </p>
+            <p className="mt-2 text-xs text-zinc-500">
+              {data ? formatBogotaDate(data.today) : "Panel de control"}
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setFeedback(null);
+                setShowCreateUser(true);
+              }}
+              className="mt-5 inline-flex h-11 w-fit items-center justify-center rounded-xl bg-zinc-950 px-5 text-sm font-medium text-white transition hover:bg-zinc-800"
+            >
+              + Registrar usuario
+            </button>
+          </div>
+          <OfficeAnimation />
+        </div>
 
         <section aria-labelledby="statistics-title" className="mt-8">
           <div className="mb-5 flex items-center gap-3">
@@ -554,10 +672,12 @@ export function ReceptionDashboard({
             ))}
           </div>
         </section>
+        </div>
 
         <section
           id="preinscripciones"
-          className="mt-8 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6"
+          hidden={activeSection !== "preinscripciones"}
+          className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6"
         >
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div className="flex items-center gap-3">
@@ -621,7 +741,7 @@ export function ReceptionDashboard({
 
         <section
           id="usuarios"
-          className="mt-8 grid gap-5 lg:grid-cols-2"
+          hidden={activeSection !== "usuarios"}
         >
           <article className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
             <div className="flex items-center gap-3">
@@ -677,58 +797,67 @@ export function ReceptionDashboard({
             )}
           </article>
 
-          <article id="asistencia" className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
-            <div className="flex items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
-                <CalendarIcon className="size-5" />
-              </div>
-              <div>
-                <h2 className="text-base font-semibold">Asistencias de hoy</h2>
-                <p className="mt-1 text-sm text-zinc-500">
-                  {data ? formatBogotaDate(data.today) : "Hora de Colombia"}
-                </p>
-              </div>
-            </div>
-            {data?.attendance.length ? (
-              <ul className="mt-5 max-h-72 divide-y divide-zinc-100 overflow-y-auto">
-                {data.attendance.map((attendance) => {
-                  const client = userById.get(attendance.client_user_id);
-                  return (
-                    <li
-                      key={attendance.id}
-                      className="flex items-center justify-between gap-3 py-3"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">
-                          {client?.full_name || client?.email || "Cliente"}
-                        </p>
-                        {client?.full_name && (
-                          <p className="truncate text-xs text-zinc-500">{client.email}</p>
-                        )}
-                      </div>
-                      <time
-                        className="shrink-0 text-xs tabular-nums text-zinc-500"
-                        dateTime={attendance.attended_at}
-                      >
-                        {new Date(attendance.attended_at).toLocaleTimeString("es-CO", {
-                          timeZone: "America/Bogota",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </time>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <p className="py-8 text-center text-sm text-zinc-500">
-                {loading ? "Cargando asistencias…" : "Aún no hay asistencias registradas hoy."}
-              </p>
-            )}
-          </article>
         </section>
 
-        <section id="planes" className="mt-8 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
+        <section
+          id="asistencia"
+          hidden={activeSection !== "asistencia"}
+          className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+              <CalendarIcon className="size-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold">Asistencias de hoy</h2>
+              <p className="mt-1 text-sm text-zinc-500">
+                {data ? formatBogotaDate(data.today) : "Hora de Colombia"}
+              </p>
+            </div>
+          </div>
+          {data?.attendance.length ? (
+            <ul className="mt-5 max-h-72 divide-y divide-zinc-100 overflow-y-auto">
+              {data.attendance.map((attendance) => {
+                const client = userById.get(attendance.client_user_id);
+                return (
+                  <li
+                    key={attendance.id}
+                    className="flex items-center justify-between gap-3 py-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">
+                        {client?.full_name || client?.email || "Cliente"}
+                      </p>
+                      {client?.full_name && (
+                        <p className="truncate text-xs text-zinc-500">{client.email}</p>
+                      )}
+                    </div>
+                    <time
+                      className="shrink-0 text-xs tabular-nums text-zinc-500"
+                      dateTime={attendance.attended_at}
+                    >
+                      {new Date(attendance.attended_at).toLocaleTimeString("es-CO", {
+                        timeZone: "America/Bogota",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </time>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="py-8 text-center text-sm text-zinc-500">
+              {loading ? "Cargando asistencias…" : "Aún no hay asistencias registradas hoy."}
+            </p>
+          )}
+        </section>
+
+        <section
+          id="planes"
+          hidden={activeSection !== "planes"}
+          className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6"
+        >
           <div className="flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-xl bg-zinc-100 text-zinc-700">
               <TableIcon className="size-5" />
@@ -756,6 +885,7 @@ export function ReceptionDashboard({
             </p>
           )}
         </section>
+      </main>
       </div>
 
       {pendingClient && (
@@ -897,6 +1027,6 @@ export function ReceptionDashboard({
           </form>
         </Modal>
       )}
-    </main>
+    </div>
   );
 }

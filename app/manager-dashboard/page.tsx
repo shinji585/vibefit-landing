@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { ManagerDashboard } from "@/components/manager-dashboard";
+import { getDashboardEntryPath } from "@/lib/dashboard-roles";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -39,10 +40,7 @@ export default async function ManagerDashboardPage() {
 
   const roles = rolesResult.data ?? [];
   if (!roles.some(({ role }) => role === "manager")) {
-    if (roles.some(({ role }) => role === "receptionist")) {
-      redirect("/receptionist-dashboard");
-    }
-    redirect("/user-dashboard");
+    redirect(getDashboardEntryPath(roles.map(({ role }) => role)));
   }
 
   return (

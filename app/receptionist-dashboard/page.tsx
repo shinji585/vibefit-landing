@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { ReceptionDashboard } from "@/components/reception-dashboard";
+import { getDashboardEntryPath } from "@/lib/dashboard-roles";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +21,7 @@ export default async function ReceptionistDashboardPage() {
   const [accountResult, rolesResult] = await Promise.all([
     supabase
       .from("users")
-      .select("account_status, full_name")
+      .select("account_status, full_name, email")
       .eq("id", userId)
       .maybeSingle(),
     supabase.from("user_roles").select("role").eq("user_id", userId),
@@ -38,12 +39,14 @@ export default async function ReceptionistDashboardPage() {
   }
 
   const roles = rolesResult.data ?? [];
-  if (roles.some(({ role }) => role === "manager")) {
-    redirect("/manager-dashboard");
-  }
   if (!roles.some(({ role }) => role === "receptionist")) {
-    redirect("/user-dashboard");
+    redirect(getDashboardEntryPath(roles.map(({ role }) => role)));
   }
 
-  return <ReceptionDashboard receptionistName={accountResult.data.full_name} />;
+  return (
+    <ReceptionDashboard
+      receptionistName={accountResult.data.full_name}
+      receptionistEmail={accountResult.data.email}
+    />
+  );
 }

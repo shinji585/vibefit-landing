@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
@@ -33,9 +34,16 @@ import {
   XIcon,
 } from "@/components/dashboard-icons";
 import { AnimatedIcon } from "@/components/animated-icon";
+import { DashboardSidebar } from "@/components/dashboard-sidebar";
+import {
+  DashboardLoadingOverlay,
+  DashboardMascot,
+} from "@/components/dashboard-experience";
+import { OfficeAnimation } from "@/components/office-animation";
 import {
   AttendanceReportSection,
   AuditLogSection,
+  ManagerCoachesSection,
   ManagerOverviewSection,
   ManagerUsersSection,
   MembershipPlansSection,
@@ -72,6 +80,12 @@ const navigation = [
     icon: PieChartIcon,
     aliases: ["auditoría", "historial", "cambios"],
   },
+  {
+    label: "Coaches y clientes",
+    href: "#coaches",
+    icon: UserCircleIcon,
+    aliases: ["coaches", "entrenadores", "clientes", "asignaciones"],
+  },
 ];
 
 const sections = [
@@ -92,8 +106,32 @@ type ManagerNotification = {
 };
 
 const unavailableNotificationStorage = "__notification_storage_unavailable__";
+type ManagerInitialLoadKey =
+  | "notifications"
+  | "overview"
+  | "users"
+  | "plans"
+  | "attendance"
+  | "audit"
+  | "coaches";
 
-function ManagerNotifications({ managerId }: { managerId: string }) {
+const managerInitialLoadKeys: ManagerInitialLoadKey[] = [
+  "notifications",
+  "overview",
+  "users",
+  "plans",
+  "attendance",
+  "audit",
+  "coaches",
+];
+
+function ManagerNotifications({
+  managerId,
+  onInitialLoad,
+}: {
+  managerId: string;
+  onInitialLoad: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<ManagerNotification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -131,6 +169,7 @@ function ManagerNotifications({ managerId }: { managerId: string }) {
 
   useEffect(() => {
     let cancelled = false;
+    let initialLoadReported = false;
 
     async function loadNotifications() {
       setLoading(true);
@@ -159,7 +198,13 @@ function ManagerNotifications({ managerId }: { managerId: string }) {
           setError(`No se pudieron cargar los usuarios recientes: ${message}`);
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          if (!initialLoadReported) {
+            initialLoadReported = true;
+            onInitialLoad();
+          }
+        }
       }
     }
 
@@ -172,7 +217,7 @@ function ManagerNotifications({ managerId }: { managerId: string }) {
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, []);
+  }, [onInitialLoad]);
 
   useEffect(() => {
     if (!open) return;
@@ -322,14 +367,44 @@ export function ManagerDashboard({
   managerName,
   managerEmail,
 }: ManagerDashboardProps) {
+  const [loadedInitialSections, setLoadedInitialSections] = useState<
+    ReadonlySet<ManagerInitialLoadKey>
+  >(() => new Set());
   const [collapsed, setCollapsed] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
+  const [selectedSearchResult, setSelectedSearchResult] = useState(0);
   const [activeSection, setActiveSection] = useState("resumen");
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const markInitialSectionLoaded = useCallback(
+    (section: ManagerInitialLoadKey) => {
+      setLoadedInitialSections((loaded) => {
+        if (loaded.has(section)) return loaded;
+        const next = new Set(loaded);
+        next.add(section);
+        return next;
+      });
+    },
+    [],
+  );
+  const initialLoadCallbacks = useMemo(
+    () => ({
+      notifications: () => markInitialSectionLoaded("notifications"),
+      overview: () => markInitialSectionLoaded("overview"),
+      users: () => markInitialSectionLoaded("users"),
+      plans: () => markInitialSectionLoaded("plans"),
+      attendance: () => markInitialSectionLoaded("attendance"),
+      audit: () => markInitialSectionLoaded("audit"),
+      coaches: () => markInitialSectionLoaded("coaches"),
+    }),
+    [markInitialSectionLoaded],
+  );
+  const dashboardDataReady = managerInitialLoadKeys.every((key) =>
+    loadedInitialSections.has(key),
+  );
   const isExpanded = !collapsed || hovered;
   const currentSection =
     sections.find((section) => section.href === `#${activeSection}`) ??
@@ -416,195 +491,32 @@ export function ManagerDashboard({
 
   function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (searchResults[0]) navigateToSection(searchResults[0].href);
+    const selectedResult =
+      searchResults[selectedSearchResult] ?? searchResults[0];
+    if (selectedResult) navigateToSection(selectedResult.href);
   }
 
   return (
     <div className="min-h-screen bg-[#f7f8fa] text-zinc-900">
-      {mobileOpen && (
-        <button
-          type="button"
-          className="fixed inset-0 z-40 bg-zinc-950/40 lg:hidden"
-          onClick={() => setMobileOpen(false)}
-          aria-label="Cerrar menú"
-        />
-      )}
-
-      <aside
-        onMouseEnter={() => {
+      <DashboardLoadingOverlay ready={dashboardDataReady} />
+      <DashboardMascot />
+      <DashboardSidebar
+        items={navigation}
+        activeSection={activeSection}
+        footerLabel="Panel de gerente"
+        expanded={isExpanded}
+        mobileOpen={mobileOpen}
+        onNavigate={navigateToSection}
+        onMobileOpenChange={setMobileOpen}
+        onHoverChange={(value) => {
           if (window.matchMedia("(min-width: 1024px)").matches && collapsed) {
-            setHovered(true);
+            setHovered(value);
           }
         }}
-        onMouseLeave={() => setHovered(false)}
-        className={`fixed inset-y-0 left-0 z-50 flex w-[18.125rem] flex-col border-r border-zinc-200 bg-white transition-[width,transform] duration-300 lg:translate-x-0 ${
-          mobileOpen ? "translate-x-0" : "-translate-x-full"
-        } ${isExpanded ? "lg:w-[18.125rem]" : "lg:w-[5.625rem]"}`}
-      >
-        <div
-          className={`flex h-[72px] shrink-0 items-center border-b border-zinc-100 px-5 ${
-            isExpanded ? "" : "lg:justify-center lg:px-3"
-          }`}
-        >
-          <a
-            href="#resumen"
-            className="flex min-w-0 items-center"
-            onClick={(event) => {
-              event.preventDefault();
-              navigateToSection("#resumen");
-            }}
-          >
-            {!isExpanded ? (
-              <Image
-                src="/logorecojido.svg?v=2"
-                alt="VibeFit"
-                width={44}
-                height={44}
-                priority
-                className="size-11 shrink-0"
-              />
-            ) : (
-              <span className="flex h-11 items-center rounded-xl bg-black px-3">
-                <Image
-                  src="/logo.svg"
-                  alt="VITEFIT"
-                  width={119}
-                  height={35}
-                  priority
-                  className="h-[30px] w-auto"
-                />
-              </span>
-            )}
-          </a>
-          <button
-            type="button"
-            className="flex size-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-100 lg:hidden"
-            onClick={() => setMobileOpen(false)}
-            aria-label="Cerrar menú"
-          >
-            <AnimatedIcon className="size-5">
-              <XIcon className="size-5" />
-            </AnimatedIcon>
-          </button>
-        </div>
-
-        <nav className="flex-1 overflow-y-auto px-3 py-6">
-          <p
-            className={`mb-3 px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-400 ${
-              !isExpanded ? "lg:hidden" : ""
-            }`}
-          >
-            Menu
-          </p>
-          <ul className="space-y-1.5">
-            <li>
-              <motion.a
-                href="#resumen"
-                whileHover="hover"
-                whileTap="tap"
-                onClick={(event) => {
-                  event.preventDefault();
-                  navigateToSection("#resumen");
-                }}
-                title={!isExpanded ? "Dashboard" : undefined}
-                aria-current={activeSection === "resumen" ? "page" : undefined}
-                className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition hover:bg-zinc-100 hover:text-zinc-950 ${
-                  activeSection === "resumen"
-                    ? "bg-zinc-100 text-zinc-950"
-                    : "text-zinc-600"
-                } ${
-                  isExpanded ? "" : "lg:justify-center lg:px-0"
-                }`}
-              >
-                <AnimatedIcon className="size-6 shrink-0" trigger="parent">
-                  <LayoutGridIcon className="size-6" />
-                </AnimatedIcon>
-                <span className={!isExpanded ? "lg:hidden" : ""}>Dashboard</span>
-                <AnimatedIcon
-                  effect="rotate"
-                  className={`ml-auto size-4 ${
-                    !isExpanded ? "lg:hidden" : ""
-                  }`}
-                  trigger="parent"
-                >
-                  <ChevronDownIcon
-                    className={`size-4 transition-transform ${
-                      !isExpanded ? "" : "-rotate-180"
-                    }`}
-                  />
-                </AnimatedIcon>
-              </motion.a>
-              <a
-                href="#resumen"
-                onClick={(event) => {
-                  event.preventDefault();
-                  navigateToSection("#resumen");
-                }}
-                aria-current={activeSection === "resumen" ? "page" : undefined}
-                className={`mt-1 flex min-h-10 items-center rounded-lg px-3 text-sm font-medium transition hover:bg-zinc-100 ${
-                  activeSection === "resumen"
-                    ? "bg-zinc-100 text-zinc-800"
-                    : "text-zinc-600"
-                } ${
-                  !isExpanded ? "lg:hidden" : "ml-9"
-                }`}
-              >
-                Resumen
-              </a>
-            </li>
-            {navigation.map((item) => {
-              const Icon = item.icon;
-              return (
-                <li key={item.href}>
-                  <motion.a
-                    href={item.href}
-                    whileHover="hover"
-                    whileTap="tap"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      navigateToSection(item.href);
-                    }}
-                    title={!isExpanded ? item.label : undefined}
-                    aria-current={activeSection === item.href.slice(1) ? "page" : undefined}
-                    className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition hover:bg-zinc-100 hover:text-zinc-950 ${
-                      activeSection === item.href.slice(1)
-                        ? "bg-zinc-100 text-zinc-950"
-                        : "text-zinc-600"
-                    } ${
-                      isExpanded ? "" : "lg:justify-center lg:px-0"
-                    }`}
-                  >
-                    <AnimatedIcon className="size-6 shrink-0" trigger="parent">
-                      <Icon className="size-6" />
-                    </AnimatedIcon>
-                    <span className={!isExpanded ? "lg:hidden" : ""}>
-                      {item.label}
-                    </span>
-                  </motion.a>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
-
-        <div className="border-t border-zinc-100 p-4">
-          <div
-            className={`rounded-xl bg-zinc-50 p-3 ${
-              !isExpanded ? "lg:hidden" : ""
-            }`}
-          >
-            <p className="truncate text-xs font-semibold text-zinc-800">
-              VibeFit
-            </p>
-            <p className="mt-0.5 truncate text-xs text-zinc-500">
-              Panel de gerente
-            </p>
-          </div>
-        </div>
-      </aside>
+      />
 
       <div
-        className={`min-h-screen transition-[padding] duration-300 ${
+        className={`min-h-screen transition-[padding] duration-500 ease-in-out ${
           isExpanded ? "lg:pl-[18.125rem]" : "lg:pl-[5.625rem]"
         }`}
       >
@@ -646,13 +558,44 @@ export function ManagerDashboard({
                   onFocus={() => setSearchOpen(true)}
                   onChange={(event) => {
                     setSearchQuery(event.target.value);
+                    setSelectedSearchResult(0);
                     setSearchOpen(true);
                   }}
                   onKeyDown={(event) => {
-                    if (event.key === "Escape") setSearchOpen(false);
+                    if (event.key === "Escape") {
+                      setSearchOpen(false);
+                      return;
+                    }
+
+                    if (
+                      (event.key === "ArrowDown" ||
+                        event.key === "ArrowUp") &&
+                      searchResults.length > 0
+                    ) {
+                      event.preventDefault();
+                      setSearchOpen(true);
+                      setSelectedSearchResult((current) => {
+                        const direction = event.key === "ArrowDown" ? 1 : -1;
+                        return (
+                          (current + direction + searchResults.length) %
+                          searchResults.length
+                        );
+                      });
+                    }
                   }}
+                  role="combobox"
+                  aria-autocomplete="list"
+                  aria-haspopup="listbox"
                   aria-label="Buscar una sección del dashboard"
                   aria-controls="manager-search-results"
+                  aria-expanded={Boolean(searchOpen && searchQuery.trim())}
+                  aria-activedescendant={
+                    searchOpen &&
+                    searchQuery.trim() &&
+                    searchResults[selectedSearchResult]
+                      ? `manager-search-option-${selectedSearchResult}`
+                      : undefined
+                  }
                   placeholder="Buscar usuarios, planes, asistencia..."
                   className="min-w-0 flex-1 bg-transparent text-sm text-zinc-900 outline-none placeholder:text-zinc-400"
                 />
@@ -663,22 +606,36 @@ export function ManagerDashboard({
               {searchOpen && searchQuery.trim() && (
                 <div
                   id="manager-search-results"
+                  role="listbox"
+                  aria-label="Resultados de búsqueda"
                   className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-xl border border-zinc-200 bg-white py-1 shadow-lg"
                 >
                   {searchResults.length ? (
-                    searchResults.map((item) => (
-                      <button
-                        key={item.href}
-                        type="button"
-                        onClick={() => navigateToSection(item.href)}
-                        className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-zinc-700 transition hover:bg-zinc-50"
-                      >
-                        <AnimatedIcon className="size-4 text-zinc-500">
-                          <item.icon className="size-4" />
-                        </AnimatedIcon>
-                        {item.label}
-                      </button>
-                    ))
+                    searchResults.map((item, index) => {
+                      const isSelected = selectedSearchResult === index;
+
+                      return (
+                        <button
+                          key={item.href}
+                          id={`manager-search-option-${index}`}
+                          type="button"
+                          role="option"
+                          aria-selected={isSelected}
+                          onMouseEnter={() => setSelectedSearchResult(index)}
+                          onClick={() => navigateToSection(item.href)}
+                          className={`flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-zinc-900 ${
+                            isSelected
+                              ? "bg-zinc-100 text-zinc-950"
+                              : "text-zinc-700 hover:bg-zinc-50"
+                          }`}
+                        >
+                          <AnimatedIcon className="size-4 text-zinc-500">
+                            <item.icon className="size-4" />
+                          </AnimatedIcon>
+                          {item.label}
+                        </button>
+                      );
+                    })
                   ) : (
                     <p className="px-4 py-3 text-sm text-zinc-500">
                       No se encontró una sección para “{searchQuery}”.
@@ -700,7 +657,10 @@ export function ManagerDashboard({
           </div>
 
           <div className="flex items-center gap-2 sm:gap-4">
-            <ManagerNotifications managerId={managerId} />
+            <ManagerNotifications
+              managerId={managerId}
+              onInitialLoad={initialLoadCallbacks.notifications}
+            />
             <span className="hidden h-8 w-px bg-zinc-200 sm:block" />
             <div className="relative" ref={userMenuRef}>
               <motion.button
@@ -710,7 +670,7 @@ export function ManagerDashboard({
                 aria-haspopup="menu"
                 aria-expanded={userMenuOpen}
                 aria-controls="manager-user-menu"
-                aria-label="Abrir opciones de Gerencia"
+                aria-label={`Abrir opciones de ${managerName?.trim() || "Admin"}`}
                 onClick={() => setUserMenuOpen((open) => !open)}
                 className="flex items-center gap-2 rounded-xl p-1.5 text-left transition hover:bg-zinc-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-400 sm:gap-3 sm:px-2"
               >
@@ -721,7 +681,7 @@ export function ManagerDashboard({
                 </span>
                 <span className="hidden leading-tight sm:block">
                   <span className="block text-sm font-semibold text-zinc-800">
-                    Gerencia
+                    {managerName?.trim() || "Admin"}
                   </span>
                   <span className="mt-0.5 block text-xs text-zinc-500">
                     VibeFit
@@ -821,48 +781,91 @@ export function ManagerDashboard({
         </header>
 
         <main className="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
+          {activeSection === "resumen" ? (
+            <div className="mb-6 overflow-hidden rounded-[28px] border border-zinc-200 bg-white">
+              <div
+                className="grid"
+                style={{
+                  gridTemplateColumns:
+                    "repeat(auto-fit, minmax(min(100%, 360px), 1fr))",
+                  minHeight: 500,
+                }}
+              >
+                <div className="flex flex-col justify-center p-5 sm:p-8 lg:p-10">
+                  <div className="flex items-center gap-3">
+                    <span
+                      className="h-px w-8 bg-zinc-950"
+                      aria-hidden="true"
+                    />
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                      VibeFit / Administración
+                    </p>
+                  </div>
+                  <h1 className="mt-5 text-[clamp(3rem,5.5vw,5rem)] font-bold leading-[0.88] tracking-[-0.065em] text-zinc-950">
+                    Bienvenido, {managerName?.trim() || "gerente"}
+                  </h1>
+                  <div className="mt-6 grid grid-cols-[auto_1fr] items-start gap-x-3">
+                    <span className="pt-0.5 text-[10px] font-medium tracking-[0.12em] text-zinc-500">
+                      01
+                    </span>
+                    <div>
+                      <span
+                        className="mb-2 block h-px w-full bg-zinc-950/30"
+                        aria-hidden="true"
+                      />
+                      <p className="text-sm text-zinc-500">
+                        Resumen de inscripciones, asistencias y planes.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <OfficeAnimation />
+              </div>
+            </div>
+          ) : (
+            <div className="mb-6">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
                 VibeFit / Administración
               </p>
               <h1 className="mt-2 text-2xl font-bold tracking-tight text-zinc-950 sm:text-3xl">
-                {currentSection.label === "Resumen"
-                  ? "Dashboard del gerente"
-                  : currentSection.label}
+                {currentSection.label}
               </h1>
               <p className="mt-1 text-sm text-zinc-500">
-                {activeSection === "resumen"
-                  ? "Resumen de inscripciones, asistencias y planes."
-                  : activeSection === "usuarios"
-                    ? "Administra las cuentas, sus roles y su estado."
-                    : activeSection === "planes"
-                      ? "Consulta y administra los planes de membresía."
-                      : activeSection === "asistencia"
-                        ? "Consulta la asistencia por fecha y franja horaria."
-                        : "Consulta el historial de cambios del sistema."}
+                {activeSection === "usuarios"
+                  ? "Administra las cuentas, sus roles y su estado."
+                  : activeSection === "planes"
+                    ? "Consulta y administra los planes de membresía."
+                    : activeSection === "asistencia"
+                      ? "Consulta la asistencia por fecha y franja horaria."
+                      : activeSection === "coaches"
+                        ? "Administra la asignación de coaches a clientes."
+                      : "Consulta el historial de cambios del sistema."}
               </p>
             </div>
-            <span className="inline-flex w-fit items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-600">
-              <span className="size-1.5 rounded-full bg-emerald-500" />
-              Panel de gestión
-            </span>
-          </div>
+          )}
 
           <div hidden={activeSection !== "resumen"}>
-            <ManagerOverviewSection />
+            <ManagerOverviewSection onInitialLoad={initialLoadCallbacks.overview} />
           </div>
           <div hidden={activeSection !== "usuarios"}>
-            <ManagerUsersSection managerId={managerId} />
+            <ManagerUsersSection
+              managerId={managerId}
+              onInitialLoad={initialLoadCallbacks.users}
+            />
           </div>
           <div hidden={activeSection !== "planes"}>
-            <MembershipPlansSection />
+            <MembershipPlansSection onInitialLoad={initialLoadCallbacks.plans} />
           </div>
           <div hidden={activeSection !== "asistencia"}>
-            <AttendanceReportSection />
+            <AttendanceReportSection
+              onInitialLoad={initialLoadCallbacks.attendance}
+            />
           </div>
           <div hidden={activeSection !== "auditoria"}>
-            <AuditLogSection />
+            <AuditLogSection onInitialLoad={initialLoadCallbacks.audit} />
+          </div>
+          <div hidden={activeSection !== "coaches"}>
+            <ManagerCoachesSection onInitialLoad={initialLoadCallbacks.coaches} />
           </div>
         </main>
       </div>

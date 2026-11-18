@@ -16,6 +16,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { login } from "@/app/actions/auth";
 import { createClient } from "@/lib/supabase/client";
+import {
+  cancelDashboardLoading,
+  startDashboardLoading,
+} from "@/lib/dashboard-loading";
+import { DashboardLoadingOverlay } from "@/components/dashboard-experience";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -115,6 +120,7 @@ export function SplitLoginForm({
   async function handleGoogleSignIn() {
     setMessage(null);
     setGoogleLoading(true);
+    startDashboardLoading();
 
     try {
       const supabase = createClient();
@@ -127,6 +133,7 @@ export function SplitLoginForm({
 
       if (error) {
         console.error("Supabase Google sign-in failed.", error);
+        cancelDashboardLoading();
         setMessage({
           ok: false,
           text: "No se pudo iniciar sesión con Google. Intenta de nuevo.",
@@ -135,6 +142,7 @@ export function SplitLoginForm({
       }
     } catch (error) {
       console.error("Unexpected error while signing in with Google.", error);
+      cancelDashboardLoading();
       setMessage({
         ok: false,
         text: "No se pudo iniciar sesión con Google. Intenta de nuevo más tarde.",
@@ -148,12 +156,14 @@ export function SplitLoginForm({
     form.clearErrors();
 
     if (!isSignup) {
+      startDashboardLoading();
       const result = await login({
         email: values.email,
         password: values.password,
       });
 
       if (result?.error) {
+        cancelDashboardLoading();
         form.setError("root", { message: result.error });
       }
       return;
@@ -193,6 +203,7 @@ export function SplitLoginForm({
       }
 
       if (data.session) {
+        startDashboardLoading();
         window.location.assign("/user-dashboard");
         return;
       }
@@ -215,6 +226,7 @@ export function SplitLoginForm({
 
   return (
     <main className="min-h-screen bg-white p-3 sm:p-6 lg:p-8">
+      <DashboardLoadingOverlay ready={false} />
       <div className="mx-auto grid min-h-[calc(100vh-1.5rem)] max-w-7xl grid-cols-1 overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-[0_24px_100px_rgba(0,0,0,0.08)] sm:min-h-[calc(100vh-3rem)] lg:grid-cols-2 lg:min-h-[min(820px,calc(100vh-4rem))]">
         <motion.aside
           layout

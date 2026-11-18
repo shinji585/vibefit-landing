@@ -1,6 +1,11 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PendingAccount } from "@/components/pending-account";
+import { getDashboardEntryPath } from "@/lib/dashboard-roles";
+import {
+  DashboardLoadingOverlay,
+  DashboardMascot,
+} from "@/components/dashboard-experience";
 
 export const dynamic = "force-dynamic";
 
@@ -30,18 +35,23 @@ export default async function UserDashboardPage() {
     throw rolesError;
   }
 
-  if (roles?.some(({ role }) => role === "manager")) {
-    redirect("/manager-dashboard");
-  }
-  if (roles?.some(({ role }) => role === "receptionist")) {
-    redirect("/receptionist-dashboard");
+  const roleNames = (roles ?? []).map(({ role }) => role);
+  const entryPath = getDashboardEntryPath(roleNames);
+  if (entryPath !== "/user-dashboard") {
+    redirect(entryPath);
   }
 
-  const uniqueRoles = new Set((roles ?? []).map(({ role }) => role));
+  const uniqueRoles = new Set(roleNames);
   const isOnlyClient = uniqueRoles.size === 1 && uniqueRoles.has("client");
 
   if (!isOnlyClient) {
-    return <main className="min-h-screen" />;
+    return (
+      <>
+        <DashboardLoadingOverlay ready />
+        <DashboardMascot />
+        <main className="min-h-screen" />
+      </>
+    );
   }
 
   const dateParts = Object.fromEntries(
@@ -73,5 +83,11 @@ export default async function UserDashboardPage() {
     return <PendingAccount />;
   }
 
-  return <main className="min-h-screen" />;
+  return (
+    <>
+      <DashboardLoadingOverlay ready />
+      <DashboardMascot />
+      <main className="min-h-screen" />
+    </>
+  );
 }

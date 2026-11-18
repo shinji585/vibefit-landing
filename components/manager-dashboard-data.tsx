@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type FormEvent,
+} from "react";
 import { createManagerUser } from "@/app/actions/manager";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -161,6 +167,10 @@ function bogotaDateValue(date: Date) {
     }, {});
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
+
+const subscribeToHydration = () => () => {};
+const getClientHydrationSnapshot = () => true;
+const getServerHydrationSnapshot = () => false;
 
 function addCalendarDays(date: string, days: number) {
   const [year, month, day] = date.split("-").map(Number);
@@ -406,7 +416,11 @@ function AuditSnapshot({
   );
 }
 
-export function ManagerOverviewSection() {
+export function ManagerOverviewSection({
+  onInitialLoad,
+}: {
+  onInitialLoad?: () => void;
+}) {
   const [signupDays, setSignupDays] = useState<SignupDay[]>([]);
   const [membershipStatusDays, setMembershipStatusDays] = useState<
     MembershipStatusDay[]
@@ -437,6 +451,13 @@ export function ManagerOverviewSection() {
 
   useEffect(() => {
     let cancelled = false;
+    const initialLoads = new Set<string>();
+
+    function completeInitialLoad(name: string) {
+      if (cancelled || initialLoads.has(name)) return;
+      initialLoads.add(name);
+      if (initialLoads.size === 4) onInitialLoad?.();
+    }
 
     async function loadSignups() {
       setSignupsLoading(true);
@@ -477,6 +498,7 @@ export function ManagerOverviewSection() {
         if (!cancelled) setSignupsError(getErrorMessage(error));
       } finally {
         if (!cancelled) setSignupsLoading(false);
+        completeInitialLoad("signups");
       }
     }
 
@@ -548,6 +570,7 @@ export function ManagerOverviewSection() {
         if (!cancelled) setMembershipStatusError(getErrorMessage(error));
       } finally {
         if (!cancelled) setMembershipStatusLoading(false);
+        completeInitialLoad("membership-status");
       }
     }
 
@@ -555,13 +578,14 @@ export function ManagerOverviewSection() {
       setAttendanceLoading(true);
       setAttendanceError(null);
       try {
-        const totals = await loadAttendanceTotals(localDateValue(new Date()));
+        const totals = await loadAttendanceTotals(bogotaDateValue(new Date()));
         if (!cancelled) setAttendance(totals);
       } catch (error) {
         console.error("Could not load today's attendance summary.", error);
         if (!cancelled) setAttendanceError(getErrorMessage(error));
       } finally {
         if (!cancelled) setAttendanceLoading(false);
+        completeInitialLoad("attendance");
       }
     }
 
@@ -581,6 +605,7 @@ export function ManagerOverviewSection() {
         if (!cancelled) setPlansError(getErrorMessage(error));
       } finally {
         if (!cancelled) setPlansLoading(false);
+        completeInitialLoad("plans");
       }
     }
 
@@ -596,7 +621,7 @@ export function ManagerOverviewSection() {
       cancelled = true;
       window.clearInterval(membershipStatusIntervalId);
     };
-  }, []);
+  }, [onInitialLoad]);
 
   const chartWidth = 640;
   const chartHeight = 220;
@@ -763,8 +788,9 @@ export function ManagerOverviewSection() {
           <SectionHeading
             icon={CalendarIcon}
             title="Asistencias por franja"
-            description={`Registros de hoy · ${new Intl.DateTimeFormat("es", {
+            description={`Registros de hoy · ${new Intl.DateTimeFormat("es-CO", {
               dateStyle: "medium",
+              timeZone: "America/Bogota",
             }).format(new Date())}`}
           />
           {attendanceLoading ? (
@@ -1006,7 +1032,13 @@ function UserAccountRow({
   );
 }
 
-export function ManagerUsersSection({ managerId }: { managerId: string }) {
+export function ManagerUsersSection({
+  managerId,
+  onInitialLoad,
+}: {
+  managerId: string;
+  onInitialLoad?: () => void;
+}) {
   const [users, setUsers] = useState<ManagerUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1015,6 +1047,7 @@ export function ManagerUsersSection({ managerId }: { managerId: string }) {
   const [creatingUser, setCreatingUser] = useState(false);
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const initialLoadReported = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -1033,14 +1066,20 @@ export function ManagerUsersSection({ managerId }: { managerId: string }) {
         console.error("Could not load manager user accounts.", loadError);
         if (!cancelled) setError(getErrorMessage(loadError));
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          if (!initialLoadReported.current) {
+            initialLoadReported.current = true;
+            onInitialLoad?.();
+          }
+        }
       }
     }
     void loadUsers();
     return () => {
       cancelled = true;
     };
-  }, [managerId, reloadKey]);
+  }, [managerId, onInitialLoad, reloadKey]);
 
   async function handleCreateUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1329,17 +1368,20 @@ function MembershipPlanForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_140px_160px_auto]">
-      <label className="text-xs font-medium text-zinc-600">
+    <form
+      onSubmit={handleSubmit}
+      className="grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(100%,220px),1fr))] gap-3"
+    >
+      <label className="min-w-0 text-xs font-medium text-black">
         Nombre del plan
         <input
           value={name}
           onChange={(event) => setName(event.target.value)}
           required
-          className="mt-1 h-10 w-full rounded-lg border border-zinc-200 px-3 text-sm text-zinc-900"
+          className="mt-1 h-10 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm text-black"
         />
       </label>
-      <label className="text-xs font-medium text-zinc-600">
+      <label className="min-w-0 text-xs font-medium text-black">
         Precio
         <input
           type="number"
@@ -1348,10 +1390,10 @@ function MembershipPlanForm({
           value={price}
           onChange={(event) => setPrice(event.target.value)}
           required
-          className="mt-1 h-10 w-full rounded-lg border border-zinc-200 px-3 text-sm text-zinc-900"
+          className="mt-1 h-10 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm text-black"
         />
       </label>
-      <label className="text-xs font-medium text-zinc-600">
+      <label className="min-w-0 text-xs font-medium text-black">
         Duración (días)
         <input
           type="number"
@@ -1360,10 +1402,10 @@ function MembershipPlanForm({
           value={duration}
           onChange={(event) => setDuration(event.target.value)}
           required
-          className="mt-1 h-10 w-full rounded-lg border border-zinc-200 px-3 text-sm text-zinc-900"
+          className="mt-1 h-10 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm text-black"
         />
       </label>
-      <div className="flex items-end gap-2">
+      <div className="col-span-full flex items-end justify-end gap-2">
         <button
           type="submit"
           disabled={busy}
@@ -1375,18 +1417,22 @@ function MembershipPlanForm({
           <button
             type="button"
             onClick={onCancel}
-            className="h-10 rounded-lg border border-zinc-200 px-3 text-xs text-zinc-600 hover:bg-zinc-50"
+            className="h-10 rounded-lg border border-zinc-300 px-3 text-xs text-black hover:bg-zinc-50"
           >
             Cancelar
           </button>
         )}
       </div>
-      {error && <p role="alert" className="text-xs text-red-600 sm:col-span-4">{error}</p>}
+      {error && <p role="alert" className="col-span-full text-xs text-red-700">{error}</p>}
     </form>
   );
 }
 
-export function MembershipPlansSection() {
+export function MembershipPlansSection({
+  onInitialLoad,
+}: {
+  onInitialLoad?: () => void;
+}) {
   const [plans, setPlans] = useState<MembershipPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -1395,6 +1441,7 @@ export function MembershipPlansSection() {
   const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const initialLoadReported = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -1412,14 +1459,20 @@ export function MembershipPlansSection() {
         console.error("Could not load membership plans.", error);
         if (!cancelled) setLoadError(getErrorMessage(error));
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          if (!initialLoadReported.current) {
+            initialLoadReported.current = true;
+            onInitialLoad?.();
+          }
+        }
       }
     }
     void loadPlans();
     return () => {
       cancelled = true;
     };
-  }, [reloadKey]);
+  }, [onInitialLoad, reloadKey]);
 
   async function savePlan(
     values: { plan_name: string; price: number; duration_in_days: number },
@@ -1543,8 +1596,12 @@ export function MembershipPlansSection() {
   );
 }
 
-export function AttendanceReportSection() {
-  const [date, setDate] = useState(() => localDateValue(new Date()));
+export function AttendanceReportSection({
+  onInitialLoad,
+}: {
+  onInitialLoad?: () => void;
+}) {
+  const [date, setDate] = useState(() => bogotaDateValue(new Date()));
   const [totals, setTotals] = useState<AttendanceTotals>({
     morning: 0,
     afternoon: 0,
@@ -1553,6 +1610,12 @@ export function AttendanceReportSection() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const hasHydrated = useSyncExternalStore(
+    subscribeToHydration,
+    getClientHydrationSnapshot,
+    getServerHydrationSnapshot,
+  );
+  const initialLoadReported = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -1602,14 +1665,20 @@ export function AttendanceReportSection() {
         console.error("Could not load attendance report.", loadError);
         if (!cancelled) setError(getErrorMessage(loadError));
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          if (!initialLoadReported.current) {
+            initialLoadReported.current = true;
+            onInitialLoad?.();
+          }
+        }
       }
     }
     void loadAttendance();
     return () => {
       cancelled = true;
     };
-  }, [date, reloadKey]);
+  }, [date, onInitialLoad, reloadKey]);
 
   return (
     <section
@@ -1651,7 +1720,7 @@ export function AttendanceReportSection() {
       <button
         type="button"
         onClick={() => setReloadKey((key) => key + 1)}
-        disabled={loading}
+        disabled={!hasHydrated || loading}
         className="mt-4 rounded-lg border border-zinc-200 px-3 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
       >
         Actualizar reporte
@@ -1660,13 +1729,18 @@ export function AttendanceReportSection() {
   );
 }
 
-export function AuditLogSection() {
+export function AuditLogSection({
+  onInitialLoad,
+}: {
+  onInitialLoad?: () => void;
+}) {
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [actorNames, setActorNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actorError, setActorError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const initialLoadReported = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -1709,14 +1783,20 @@ export function AuditLogSection() {
         console.error("Could not load manager audit log.", loadError);
         if (!cancelled) setError(getErrorMessage(loadError));
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          if (!initialLoadReported.current) {
+            initialLoadReported.current = true;
+            onInitialLoad?.();
+          }
+        }
       }
     }
     void loadAudit();
     return () => {
       cancelled = true;
     };
-  }, [reloadKey]);
+  }, [onInitialLoad, reloadKey]);
 
   return (
     <section
@@ -1789,6 +1869,398 @@ export function AuditLogSection() {
             </article>
           ))}
         </div>
+      )}
+    </section>
+  );
+}
+
+type CoachAssignment = {
+  coach_user_id: string;
+  client_user_id: string;
+};
+
+type CoachManagementUser = {
+  id: string;
+  full_name: string | null;
+  email: string;
+  user_roles: { role: RoleName }[];
+};
+
+function databaseErrorCode(error: unknown) {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof error.code === "string"
+  ) {
+    return error.code;
+  }
+  return null;
+}
+
+export function ManagerCoachesSection({
+  onInitialLoad,
+}: {
+  onInitialLoad?: () => void;
+}) {
+  const [coaches, setCoaches] = useState<CoachManagementUser[]>([]);
+  const [clients, setClients] = useState<CoachManagementUser[]>([]);
+  const [assignments, setAssignments] = useState<CoachAssignment[]>([]);
+  const [selectedCoachId, setSelectedCoachId] = useState("");
+  const [selectedClientId, setSelectedClientId] = useState("");
+  const [allowMultipleCoaches, setAllowMultipleCoaches] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{
+    ok: boolean;
+    text: string;
+  } | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const initialLoadReported = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCoachAssignments() {
+      setLoading(true);
+      setError(null);
+      try {
+        const supabase = createClient();
+        const [usersResult, assignmentsResult] = await Promise.all([
+          supabase
+            .from("users")
+            .select("id, full_name, email, user_roles!user_id(role)")
+            .order("full_name"),
+          supabase
+            .from("client_coach_assignments")
+            .select("coach_user_id, client_user_id"),
+        ]);
+        if (usersResult.error) throw usersResult.error;
+        if (assignmentsResult.error) throw assignmentsResult.error;
+
+        const users = usersResult.data ?? [];
+        const nextCoaches = users.filter((user) =>
+          user.user_roles.some(({ role }) => role === "coach"),
+        );
+        const nextClients = users.filter((user) =>
+          user.user_roles.some(({ role }) => role === "client"),
+        );
+        if (cancelled) return;
+
+        setCoaches(nextCoaches);
+        setClients(nextClients);
+        setAssignments(assignmentsResult.data ?? []);
+        setSelectedCoachId((current) =>
+          nextCoaches.some(({ id }) => id === current)
+            ? current
+            : (nextCoaches[0]?.id ?? ""),
+        );
+        setSelectedClientId((current) =>
+          nextClients.some(({ id }) => id === current)
+            ? current
+            : (nextClients[0]?.id ?? ""),
+        );
+      } catch (loadError) {
+        console.error("Could not load coach-client assignments.", loadError);
+        if (!cancelled) {
+          setError("No se pudieron cargar los coaches y sus clientes.");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+          if (!initialLoadReported.current) {
+            initialLoadReported.current = true;
+            onInitialLoad?.();
+          }
+        }
+      }
+    }
+
+    void loadCoachAssignments();
+    return () => {
+      cancelled = true;
+    };
+  }, [onInitialLoad, reloadKey]);
+
+  const assignedToOtherCoach = assignments.find(
+    (assignment) =>
+      assignment.client_user_id === selectedClientId &&
+      assignment.coach_user_id !== selectedCoachId,
+  );
+  const otherCoach = coaches.find(
+    ({ id }) => id === assignedToOtherCoach?.coach_user_id,
+  );
+  const alreadyAssigned = assignments.some(
+    (assignment) =>
+      assignment.client_user_id === selectedClientId &&
+      assignment.coach_user_id === selectedCoachId,
+  );
+
+  async function handleAssign(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedCoachId || !selectedClientId || alreadyAssigned) return;
+    if (assignedToOtherCoach && !allowMultipleCoaches) return;
+
+    setBusy(true);
+    setFeedback(null);
+    const { error: insertError } = await createClient()
+      .from("client_coach_assignments")
+      .insert({
+        coach_user_id: selectedCoachId,
+        client_user_id: selectedClientId,
+      });
+
+    if (insertError) {
+      console.error("Could not assign client to coach.", insertError);
+      const code = databaseErrorCode(insertError);
+      setFeedback({
+        ok: false,
+        text:
+          code === "23514"
+            ? "Un coach no puede ser su propio cliente."
+            : code === "23505"
+              ? "Este cliente ya está asignado a ese coach."
+              : "No se pudo asignar el cliente. Verifica los datos e intenta de nuevo.",
+      });
+      setBusy(false);
+      return;
+    }
+
+    setFeedback({ ok: true, text: "Cliente asignado correctamente." });
+    setAllowMultipleCoaches(false);
+    setReloadKey((key) => key + 1);
+    setBusy(false);
+  }
+
+  async function handleRemoveAssignment(assignment: CoachAssignment) {
+    setBusy(true);
+    setFeedback(null);
+    const { error: deleteError } = await createClient()
+      .from("client_coach_assignments")
+      .delete()
+      .eq("coach_user_id", assignment.coach_user_id)
+      .eq("client_user_id", assignment.client_user_id);
+
+    if (deleteError) {
+      console.error("Could not remove coach-client assignment.", deleteError);
+      setFeedback({
+        ok: false,
+        text: "No se pudo quitar la asignación. Intenta de nuevo.",
+      });
+      setBusy(false);
+      return;
+    }
+
+    setFeedback({ ok: true, text: "Asignación quitada correctamente." });
+    setReloadKey((key) => key + 1);
+    setBusy(false);
+  }
+
+  return (
+    <section
+      id="coaches"
+      className="scroll-mt-24 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm shadow-zinc-950/[0.02] sm:p-6"
+    >
+      <SectionHeading
+        icon={UsersIcon}
+        title="Coaches y clientes"
+        description="Asigna clientes a sus coaches y revisa la carga de cada entrenador."
+      />
+
+      <SectionMessage
+        error={error}
+        loading={loading}
+        empty={false}
+      />
+
+      {!loading && !error && (
+        <>
+          {!coaches.length && (
+            <p className="mb-4 rounded-xl bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
+              No hay coaches registrados todavía.
+            </p>
+          )}
+          {!clients.length && (
+            <p className="mb-4 rounded-xl bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
+              No hay clientes disponibles para asignar.
+            </p>
+          )}
+          {feedback && (
+            <p
+              role={feedback.ok ? "status" : "alert"}
+              className={`mb-5 rounded-xl px-4 py-3 text-sm ${
+                feedback.ok
+                  ? "bg-emerald-50 text-emerald-800"
+                  : "bg-red-50 text-red-700"
+              }`}
+            >
+              {feedback.text}
+            </p>
+          )}
+
+          <form
+            onSubmit={handleAssign}
+            className="mb-6 grid gap-4 rounded-2xl border border-zinc-200 bg-zinc-50/70 p-4 sm:grid-cols-2 sm:p-5"
+          >
+            <label className="text-sm font-medium text-zinc-700">
+              Coach
+              <select
+                value={selectedCoachId}
+                onChange={(event) => {
+                  setSelectedCoachId(event.target.value);
+                  setAllowMultipleCoaches(false);
+                }}
+                className="mt-1.5 h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm"
+                required
+              >
+                <option value="">Selecciona un coach</option>
+                {coaches.map((coach) => (
+                  <option key={coach.id} value={coach.id}>
+                    {coach.full_name || coach.email}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-sm font-medium text-zinc-700">
+              Cliente
+              <select
+                value={selectedClientId}
+                onChange={(event) => {
+                  setSelectedClientId(event.target.value);
+                  setAllowMultipleCoaches(false);
+                }}
+                className="mt-1.5 h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm"
+                required
+              >
+                <option value="">Selecciona un cliente</option>
+                {clients.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.full_name || client.email} · {client.email}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {assignedToOtherCoach && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 sm:col-span-2">
+                <p>
+                  Este cliente ya está asignado a{" "}
+                  {otherCoach?.full_name || otherCoach?.email || "otro coach"}.
+                  Puedes asignarlo a más de un coach.
+                </p>
+                <label className="mt-2 flex items-center gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={allowMultipleCoaches}
+                    onChange={(event) =>
+                      setAllowMultipleCoaches(event.target.checked)
+                    }
+                  />
+                  Confirmo la asignación a varios coaches
+                </label>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={
+                busy ||
+                !coaches.length ||
+                !clients.length ||
+                alreadyAssigned ||
+                (Boolean(assignedToOtherCoach) && !allowMultipleCoaches)
+              }
+              className="h-11 w-fit rounded-xl bg-zinc-950 px-5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-2"
+            >
+              {alreadyAssigned ? "Ya está asignado" : "Asignar cliente"}
+            </button>
+          </form>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            {coaches.map((coach) => {
+              const coachAssignments = assignments.filter(
+                ({ coach_user_id }) => coach_user_id === coach.id,
+              );
+              const exceedsSuggestedLimit = coachAssignments.length > 15;
+
+              return (
+                <article
+                  key={coach.id}
+                  className={`rounded-2xl border p-5 ${
+                    exceedsSuggestedLimit
+                      ? "border-amber-200 bg-amber-50/60"
+                      : "border-zinc-200 bg-white"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="truncate text-sm font-semibold text-zinc-900">
+                        {coach.full_name || "Coach"}
+                      </h3>
+                      <p className="mt-1 truncate text-xs text-zinc-500">
+                        {coach.email}
+                      </p>
+                    </div>
+                    <span
+                      className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
+                        exceedsSuggestedLimit
+                          ? "bg-amber-100 text-amber-800"
+                          : "bg-zinc-100 text-zinc-700"
+                      }`}
+                    >
+                      {coachAssignments.length} clientes
+                    </span>
+                  </div>
+                  {exceedsSuggestedLimit && (
+                    <p className="mt-3 text-xs font-medium text-amber-800">
+                      Este coach supera la carga sugerida de 15 clientes.
+                    </p>
+                  )}
+                  <ul className="mt-4 divide-y divide-zinc-100">
+                    {coachAssignments.map((assignment) => {
+                      const client = clients.find(
+                        ({ id }) => id === assignment.client_user_id,
+                      );
+                      if (!client) return null;
+
+                      return (
+                        <li
+                          key={`${assignment.coach_user_id}-${assignment.client_user_id}`}
+                          className="flex items-center justify-between gap-3 py-3"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-zinc-800">
+                              {client.full_name || "Cliente"}
+                            </p>
+                            <p className="truncate text-xs text-zinc-500">
+                              {client.email}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() =>
+                              void handleRemoveAssignment(assignment)
+                            }
+                            className="shrink-0 rounded-lg border border-zinc-200 px-3 py-2 text-xs font-medium text-zinc-700 transition hover:bg-white disabled:opacity-50"
+                          >
+                            Quitar
+                          </button>
+                        </li>
+                      );
+                    })}
+                    {!coachAssignments.length && (
+                      <li className="py-4 text-sm text-zinc-500">
+                        Aún no tiene clientes asignados.
+                      </li>
+                    )}
+                  </ul>
+                </article>
+              );
+            })}
+          </div>
+        </>
       )}
     </section>
   );

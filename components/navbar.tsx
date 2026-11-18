@@ -27,6 +27,7 @@ export function Navbar() {
             height={100}
             src="/logo.svg"
             alt="VibeFit"
+            loading="eager"
             className={`transition-all duration-500 h-9 w-auto ${scrolled ? "invert opacity-80" : ""}`}
           />
         </Link>

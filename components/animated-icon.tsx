@@ -8,6 +8,7 @@ type AnimatedIconProps = {
   className?: string;
   effect?: "lift" | "ring" | "rotate";
   trigger?: "self" | "parent";
+  forceMotion?: boolean;
 };
 
 export function AnimatedIcon({
@@ -15,8 +16,9 @@ export function AnimatedIcon({
   className,
   effect = "lift",
   trigger = "self",
+  forceMotion = false,
 }: AnimatedIconProps) {
-  const reduceMotion = useReducedMotion();
+  const reduceMotion = useReducedMotion() && !forceMotion;
   const variants = {
     hover: reduceMotion
       ? { opacity: 0.82 }

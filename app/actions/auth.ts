@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { getDashboardEntryPath } from "@/lib/dashboard-roles";
 import { createClient } from "@/lib/supabase/server";
 
 export async function login(values: { email: string; password: string }) {
@@ -49,17 +50,8 @@ export async function login(values: { email: string; password: string }) {
     return { error: "Tu cuenta no está activa. Contacta al gerente." };
   }
 
-  const isManager = rolesResult.data?.some(({ role }) => role === "manager");
-  const isReceptionist = rolesResult.data?.some(
-    ({ role }) => role === "receptionist",
-  );
-  redirect(
-    isManager
-      ? "/manager-dashboard"
-      : isReceptionist
-        ? "/receptionist-dashboard"
-        : "/user-dashboard",
-  );
+  const roles = (rolesResult.data ?? []).map(({ role }) => role);
+  redirect(getDashboardEntryPath(roles));
 }
 
 export async function logout() {
